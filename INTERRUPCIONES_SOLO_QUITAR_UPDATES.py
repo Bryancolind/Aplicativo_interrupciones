@@ -78,7 +78,7 @@ class SQLApp:
 
         # Imagen centrada
         login_image = CTkImage(
-            Image.open(r"C:\Users\bryan.colindres\Downloads\image-SEDL1AjhJZfPNb6TOCUarVqOe0AMdu.png"), 
+            Image.open(r"C:\Users\bryan.colindres\Downloads\image-krpJdmUaFohx12nd4YmkMmcJombnwo.png"), 
             size=(200, 200)  # tamaño más grande para estética
         )
         ctk.CTkLabel(self.login_frame, image=login_image, text="").pack(pady=(40, 20))
@@ -86,7 +86,7 @@ class SQLApp:
         # Título centrado
         ctk.CTkLabel(
             self.login_frame, 
-            text="Conexión SQL Server", 
+            text="Gestor de Interrupciones - UTCD", 
             font=("Arial", 24, "bold")
         ).pack(pady=(0, 30))
 
@@ -153,10 +153,17 @@ class SQLApp:
         ).pack()
 
         # --- Footer ---
+        footer_text = (
+            "© UTCD 2025 – Gestión de la Información\n"
+            "Sistema para monitoreo, registro y seguimiento de interrupciones eléctricas. \n"
+            "Soporte: bryan.colindres@eneeutcd.hn, cristian.umanzor@eneeutcd.hn, ruben.ayestas@eneeutcd.hn \n"
+        )
+
         ctk.CTkLabel(
             self.login_frame,
-            text="© UTCD, 2025 – Gestión de la Información",
-            font=("Arial", 12),
+            text=footer_text,
+            font=("Arial", 11),
+            justify="center",
             text_color="gray70"
         ).pack(side="bottom", pady=10)
 
@@ -288,6 +295,7 @@ class SQLApp:
         meses_esp = ["Todos los meses"] + ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", 
                                       "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
         self.current_month = meses_esp[datetime.now().month]  # Mes actual en español
+        self.current_year = datetime.now().year # Año
         # Filtro por Mes (nuevo)
         ctk.CTkLabel(filter_frame, text="Filtrar por Mes:", width=120).pack(side="left", padx=5)
         mes_menu = ctk.CTkOptionMenu(
@@ -298,6 +306,19 @@ class SQLApp:
         )
         self.filter_mes.set(self.current_month)  # Establecer el mes actual como valor por defecto
         mes_menu.pack(side="left", padx=5)
+        
+        # Filtro por Año (nuevo)
+        self.filter_ano = ctk.StringVar()  # Variable para el filtro de año
+        años = [str(year) for year in range(2025, datetime.now().year + 2)]
+        ctk.CTkLabel(filter_frame, text="Filtrar por Año:", width=120).pack(side="left", padx=6)
+        ano_menu = ctk.CTkOptionMenu(
+            filter_frame,
+            variable=self.filter_ano,
+            values=años,
+            command=lambda _: self.apply_filters() 
+        )
+        self.filter_ano.set(self.current_year)  # Establecer el mes actual como valor por defecto
+        ano_menu.pack(side="left", padx=6)
         
         # Botón Limpiar Filtros
         ctk.CTkButton(
@@ -335,8 +356,8 @@ class SQLApp:
             button_container,
             text="🔄 Eventos Pendientes",
             command=lambda: [self.active_tab.set("pendiente"),self.load_table(), update_button_style(pendientes_btn)],
-            fg_color="#007ACC",
-            hover_color="#005F9E",
+            fg_color="#515A67",
+            hover_color="#4B5563",
             corner_radius=6,
             font=("Segoe UI Semibold", 12),
             width=160,
@@ -348,8 +369,8 @@ class SQLApp:
             button_container,
             text="✅ Eventos Confirmados",
             command=lambda: [self.active_tab.set("Confirmado"),self.edita_table(), update_button_style(confirmados_btn)],
-            fg_color="#00A650",
-            hover_color="#4C165D",
+            fg_color="#10B981",
+            hover_color="#086D4B",
             corner_radius=6,
             font=("Segoe UI Semibold", 12),
             width=160,
@@ -363,8 +384,8 @@ class SQLApp:
             button_container,
             text="✏️ Editar Interrupción",
             command=self.edit_row,
-            fg_color="#68217A",
-            hover_color="#4C165D",
+            fg_color="#F59E0B",
+            hover_color="#9E6604",
             corner_radius=6,
             font=("Segoe UI Semibold", 12),
             width=160,
@@ -375,8 +396,8 @@ class SQLApp:
             button_container,
             text="❌ Eliminar Interrupción",
             command=self.delete_row,
-            fg_color="#e81313",
-            hover_color="#4C165D",
+            fg_color="#EF4444",
+            hover_color="#650303",
             corner_radius=6,
             font=("Segoe UI Semibold", 12),
             width=160,
@@ -416,8 +437,8 @@ class SQLApp:
             button_container,
             text="📤  Importar datos",
             command=self.importar_excel_y_subir_sql,
-            fg_color="#08317A",
-            hover_color="#4C165D",
+            fg_color="#096D27",
+            hover_color="#137C08",
             corner_radius=6,
             font=("Segoe UI Semibold", 12),
             width=160,
@@ -429,8 +450,8 @@ class SQLApp:
             button_container,
             text="📥 Exportar a Excel",
             command=self.export_to_excel,
-            fg_color="#4A90E2",
-            hover_color="#357ABD",
+            fg_color="#3B82F6",
+            hover_color="#1F6AE2",
             corner_radius=6,
             font=("Segoe UI Semibold", 12),
             width=160,
@@ -623,6 +644,19 @@ class SQLApp:
         )
         self.filter_mes.set(self.current_month)  # Establecer el mes actual como valor por defecto
         mes_menu.pack(side="left", padx=5)
+        
+        # Filtro por Año (nuevo)
+        self.filter_ano = ctk.StringVar()  # Variable para el filtro de año
+        años = [str(year) for year in range(2025, datetime.now().year + 2)]
+        ctk.CTkLabel(filter_frame, text="Filtrar por Año:", width=120).pack(side="left", padx=6)
+        ano_menu = ctk.CTkOptionMenu(
+            filter_frame,
+            variable=self.filter_ano,
+            values=años,
+            command=lambda _: self.apply_filters() 
+        )
+        self.filter_ano.set(self.current_year)  # Establecer el mes actual como valor por defecto
+        ano_menu.pack(side="left", padx=6)
         
         # Botón Limpiar Filtros
         ctk.CTkButton(
@@ -886,7 +920,11 @@ class SQLApp:
                 month_number = meses_esp.index(selected_month)  # Esto devuelve el índice del mes
                 conditions.append("MONTH(Fecha_apertura) = ?")
                 params.append(month_number)
-
+                
+            selected_year = self.filter_ano.get()
+            if selected_year:
+                conditions.append("YEAR(Fecha_apertura) = ?")
+                params.append(int(selected_year))
             # Si hay condiciones de filtro, agregarlas a la consulta base
             if conditions:
                 base_query += " AND " + " AND ".join(conditions)
@@ -1721,7 +1759,8 @@ class SQLApp:
         self.filter_fecha_fin.set("")
         self.filter_codigo.set("")
         self.filter_fecha.set("")
-        self.filter_mes.set(self.current_month) 
+        self.filter_mes.set(self.current_month)
+        self.filter_ano.set(self.current_year)
         # Limpiar todos los filtros de columnas
         self.active_filters.clear()
         
@@ -1740,6 +1779,7 @@ class SQLApp:
         self.filter_codigo.set("")
         self.filter_fecha.set("")
         self.filter_mes.set(self.current_month) 
+        self.filter_ano.set(self.current_year)
         # Limpiar todos los filtros de columnas
         self.active_filters.clear()
         
@@ -1976,7 +2016,12 @@ class SQLApp:
                 month_number = meses_esp.index(selected_month)  # Esto devuelve el índice del mes
                 conditions.append("MONTH(Fecha_apertura) = ?")
                 params.append(month_number)
-
+                
+            selected_year = self.filter_ano.get()
+            if selected_year:
+                conditions.append("YEAR(Fecha_apertura) = ?")
+                params.append(selected_year)
+                
             # Si hay condiciones de filtro, agregarlas a la consulta base
             if conditions:
                 base_query += " AND " + " AND ".join(conditions)
@@ -2075,7 +2120,11 @@ class SQLApp:
                 month_number = meses_esp.index(selected_month)  # Esto devuelve el índice del mes
                 conditions.append("MONTH(Fecha_apertura) = ?")
                 params.append(month_number)
-
+            
+            selected_year = self.filter_ano.get()
+            if selected_year:
+                conditions.append("YEAR(Fecha_apertura) = ?")
+                params.append(selected_year)
 
             # Agregar todas las condiciones de filtro
             if conditions:
@@ -2124,6 +2173,10 @@ class SQLApp:
 
             # 1) Crear id compuesto único
             id_registro = f"{row['Codigo_apertura']}|{row['Codigo_cierre']}"
+
+            # ⛔ 1.5) Ignorar si ya existe en el treeview
+            if id_registro in self.tree.get_children():
+                continue   # saltar duplicado
 
             # 2) Guardar todo el registro (aunque no se muestre en el tree)
             self.registros_raw[id_registro] = row.to_dict()
