@@ -735,7 +735,7 @@ class SQLApp:
         ctk.CTkButton(
             self.button_container,
             text="📥 Exportar a Excel",
-            command=self.export_to_excel,
+            command=self.export_to_excel_revision,
             fg_color="#4A90E2",
             hover_color="#357ABD",
             corner_radius=6,
@@ -2080,6 +2080,32 @@ class SQLApp:
                 messagebox.showwarning("Cancelado", "La exportación ha sido cancelada.")
         else:
             messagebox.showerror("Error", "No se encontraron datos para exportar.")
+
+    #función para exportar
+    def export_to_excel_revision(self):
+        # Obtener los datos utilizando la función load_data
+        # Seleccionar la fuente de datos según el estado activo
+        try:
+            data = self.revisados()
+            #data = self.load_table()  # Asumiendo que `load_data` retorna un DataFrame
+            
+            if data is not None:
+                # Guardar el DataFrame como un archivo Excel
+                file_path = ctk.filedialog.asksaveasfilename(defaultextension=".xlsx",
+                                                            filetypes=[("Archivos Excel", "*.xlsx")])
+                if file_path:
+                    try:
+                        data.to_excel(file_path, index=False)
+                        messagebox.showinfo("Éxito", "Los datos han sido exportados a Excel correctamente.")
+                    except Exception as e:
+                        messagebox.showerror("Error", f"No se pudo exportar el archivo: {e}")
+                else:
+                    messagebox.showwarning("Cancelado", "La exportación ha sido cancelada.")
+            else:
+                messagebox.showerror("Error", "No se encontraron datos para exportar.")
+        except Exception as e:
+            messagebox.showerror("Error", "Estado desconocido. No se puede exportar.")
+            return
 
     def edita_table(self):
         try:
