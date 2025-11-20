@@ -3271,15 +3271,45 @@ class SQLApp:
                     query_indicadores = f"""
                         UPDATE {self.table_name}
                         SET 
-                            Saifi_contribucion_global = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_nacional AS FLOAT), 0),
-                            Saidi_contribucion_global = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_nacional AS FLOAT), 0),
-                            Saifi_grupo = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_grupo AS FLOAT), 0),
-                            Saidi_grupo = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_grupo AS FLOAT), 0),
-                            Saifi_zona = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_zona AS FLOAT), 0),
-                            Saidi_zona = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_zona AS FLOAT), 0),
-                            Saifi_sector = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_sector AS FLOAT), 0),
-                            Saidi_sector = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_sector AS FLOAT), 0),
+                            -- SAIFI: si conteo_saifi es 0 → todo queda en 0
+                            Saifi_contribucion_global = CASE 
+                                WHEN conteo_saifi = 0 THEN 0
+                                ELSE CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_nacional AS FLOAT), 0)
+                            END,
+
+                            Saifi_grupo = CASE 
+                                WHEN conteo_saifi = 0 THEN 0
+                                ELSE CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_grupo AS FLOAT), 0)
+                            END,
+
+                            Saifi_zona = CASE 
+                                WHEN conteo_saifi = 0 THEN 0
+                                ELSE CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_zona AS FLOAT), 0)
+                            END,
+
+                            Saifi_sector = CASE 
+                                WHEN conteo_saifi = 0 THEN 0
+                                ELSE CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_sector AS FLOAT), 0)
+                            END,
+
+                            -- SAIDI: se calculan normal
+                            Saidi_contribucion_global = 
+                                (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) 
+                                / NULLIF(CAST(Clientes_nacional AS FLOAT), 0),
+
+                            Saidi_grupo = 
+                                (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) 
+                                / NULLIF(CAST(Clientes_grupo AS FLOAT), 0),
+
+                            Saidi_zona = 
+                                (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) 
+                                / NULLIF(CAST(Clientes_zona AS FLOAT), 0),
+
+                            Saidi_sector = 
+                                (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) 
+                                / NULLIF(CAST(Clientes_sector AS FLOAT), 0),
                             cambio_hora = 'SI'
+
                         WHERE Codigo_apertura = ? AND Codigo_cierre = ?
                     """
                     cursor.execute(query_indicadores, (str(original_data['Codigo_apertura']), str(original_data['Codigo_cierre'])))
