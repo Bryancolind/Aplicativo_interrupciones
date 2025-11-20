@@ -18,6 +18,8 @@ from office365.runtime.auth.authentication_context import AuthenticationContext
 from office365.sharepoint.files.file import File
 import webbrowser
 import locale
+from customtkinter import CTkImage
+from PIL import Image
 import requests 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("dark-blue")
@@ -35,9 +37,9 @@ class SQLApp:
         alto_pantalla = 800
         # Configurar geometría para ventana maximizada
         self.root.geometry(f"{ancho_pantalla}x{alto_pantalla}+0+0")
-        self.table_name = "BITACORA_SCADA"
+        self.table_name = "BITACORA_SCADA_BU_19112025_01"
         self.editable_columns = ["Fecha_apertura",'Fecha_cierre',"Tiempo_minutos",'Circuito', 'Subestacion','Ubicacion',"Carga_MVA", "Registro_interrupcion",'Relevador','Observacion'] #columnas que se muestran para editar
-        self.editable_invisible_columns =['Fecha_apertura','Fecha_cierre',"Tiempo_horas","Tiempo_minutos", "Carga_MVA",'Registro_interrupcion',"Clasificacion",'Relevador','Interrupcion','Observacion','Usuario_actualizacion']#Columnas que se actualizan por debajo del código
+        self.editable_invisible_columns =['Fecha_apertura','Fecha_cierre',"Tiempo_horas","Tiempo_minutos", "Carga_MVA",'Registro_interrupcion',"Clasificacion",'Relevador','Interrupcion','Observacion','Usuario_actualizacion','conteo_saifi']#Columnas que se actualizan por debajo del código
         self.display_columns = [
             'Codigo_apertura', 'Codigo_cierre', 'Fecha_apertura', 'Fecha_cierre',
             'Tiempo_horas', 'Tiempo_minutos', 'Zona', 'Sector', 'Subestacion',
@@ -49,7 +51,7 @@ class SQLApp:
         self.conn = None
         self.sort_column = None
         self.sort_order = False  # False = ascendente, True = descendente
-
+        self.hidden_columns = ["conteo_saifi"] #columnas que no se muestran en el aplicativo
         self.filter_windows = {}  # Para mantener ventanas de filtro abiertas
         self.active_filters = {}  # Diccionario de filtros activos {columna: valores}
         self.original_data = pd.DataFrame()  # Copia de los datos sin filtrar
@@ -70,84 +72,94 @@ class SQLApp:
         self.create_login_interface()
 
     def create_login_interface(self):
+        # Crear frame principal
         self.login_frame = ctk.CTkFrame(self.root, fg_color="#2B2B2B")
-        self.login_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        self.login_frame.pack(fill="both", expand=True)
 
-        ctk.CTkLabel(self.login_frame, 
-                    text="Conexión SQL Server", 
-                    font=("Arial", 20, "bold")).pack(pady=20)
+        # Imagen centrada
+        login_image = CTkImage(
+            Image.open(r"C:\Users\bryan.colindres\Downloads\image-SEDL1AjhJZfPNb6TOCUarVqOe0AMdu.png"), 
+            size=(200, 200)  # tamaño más grande para estética
+        )
+        ctk.CTkLabel(self.login_frame, image=login_image, text="").pack(pady=(40, 20))
 
-        # Valores fijos
+        # Título centrado
+        ctk.CTkLabel(
+            self.login_frame, 
+            text="Conexión SQL Server", 
+            font=("Arial", 24, "bold")
+        ).pack(pady=(0, 30))
+
+        # Mostrar valores fijos (Servidor y BD)
         server_value = "192.168.100.7"
         database_value = "GestionControl"
 
-        # Mostrar valores fijos
-        fixed_info = [
-            ("Servidor", server_value),
-            ("Base de Datos", database_value)
-        ]
+        fixed_info = [("Servidor", server_value), ("Base de Datos", database_value)]
         for text, value in fixed_info:
             frame = ctk.CTkFrame(self.login_frame, fg_color="transparent")
             frame.pack(pady=5)
-            
-            ctk.CTkLabel(frame, 
-                        text=text + ":", 
-                        width=140, 
-                        anchor="e").pack(side="left", padx=5)
-            
-            ctk.CTkLabel(frame, 
-                        text=value, 
-                        width=250, 
-                        fg_color="#3E3E3E", 
-                        corner_radius=5, 
-                        anchor="w").pack(side="left", padx=5)
+            ctk.CTkLabel(frame, text=text + ":", width=140, anchor="e").pack(side="left", padx=5)
+            ctk.CTkLabel(
+                frame, 
+                text=value, 
+                width=300,
+                fg_color="#3E3E3E", 
+                corner_radius=5, 
+                anchor="w"
+            ).pack(side="left", padx=5)
 
-        # Campos editables
+        # Campos editables: Usuario y Contraseña
         self.entries = {}
-        user_pass_inputs = [
-            ("Usuario", "user_entry"),
-            ("Contraseña", "pass_entry")
-        ]
-        
+        user_pass_inputs = [("Usuario", "user_entry"), ("Contraseña", "pass_entry")]
+
         for text, name in user_pass_inputs:
             frame = ctk.CTkFrame(self.login_frame, fg_color="transparent")
-            frame.pack(pady=5)
-            
-            ctk.CTkLabel(frame, 
-                        text=text + ":", 
-                        width=140, 
-                        anchor="e").pack(side="left", padx=5)
-            
-            entry = ctk.CTkEntry(frame, width=250, show="*" if name == "pass_entry" else "")
+            frame.pack(pady=10)
+
+            ctk.CTkLabel(frame, text=text + ":", width=140, anchor="e").pack(side="left", padx=5)
+
+            entry = ctk.CTkEntry(frame, width=300, show="*" if name == "pass_entry" else "")
             entry.pack(side="left")
-            # Bindear Enter key a validate_and_connect
-            entry.bind("<Return>", lambda event: self.validate_and_connect()) 
-            
+            entry.bind("<Return>", lambda event: self.validate_and_connect())
+
             self.entries[name] = entry
-            
-            # Botón para mostrar/ocultar contraseña
+
+            # Toggle mostrar contraseña
             if name == "pass_entry":
                 self.show_password = False
-                
+
                 def toggle_password():
                     self.show_password = not self.show_password
                     entry.configure(show="" if self.show_password else "*")
-                    toggle_btn.configure(text="🔓" if self.show_password else "🔒")  # Cambia el ícono
-                
+                    toggle_btn.configure(text="🔓" if self.show_password else "🔒")
+
                 toggle_btn = ctk.CTkButton(frame, text="🔒", width=40, command=toggle_password)
                 toggle_btn.pack(side="left", padx=5)
-        
+
+        # Botón Conectar centrado
         btn_frame = ctk.CTkFrame(self.login_frame, fg_color="transparent")
-        btn_frame.pack(pady=20)
-        
-        ctk.CTkButton(btn_frame, 
-                    text="Conectar", 
-                    command=self.validate_and_connect,
-                    fg_color="#2E8B57",
-                    hover_color="#245c3d",
-                    corner_radius=8,
-                    font=("Arial", 12, "bold")).pack(side="left", padx=10)
-    
+        btn_frame.pack(pady=(30, 40))
+
+        ctk.CTkButton(
+            btn_frame,
+            text="Conectar",
+            command=self.validate_and_connect,
+            width=200,
+            height=45,
+            fg_color="#2E8B57",
+            hover_color="#245c3d",
+            corner_radius=10,
+            font=("Arial", 14, "bold")
+        ).pack()
+
+        # --- Footer ---
+        ctk.CTkLabel(
+            self.login_frame,
+            text="© UTCD, 2025 – Gestión de la Información",
+            font=("Arial", 12),
+            text_color="gray70"
+        ).pack(side="bottom", pady=10)
+
     def validate_and_connect(self):
         self.user = self.entries['user_entry'].get().strip()
         password = self.entries['pass_entry'].get().strip()
@@ -1290,7 +1302,8 @@ class SQLApp:
         
         # Campos de solo lectura
         read_only_fields = ['Circuito', 'Subestacion', 'Ubicacion']
-        
+        conteo_saifi = entries["conteo_saifi"].get()  # 1 o 0
+        print(f'Cuenta SAIFI: {conteo_saifi}')
         # Construir new_data excluyendo campos bloqueados
         new_data = {}
         for col in self.editable_columns_2:
@@ -1927,8 +1940,10 @@ class SQLApp:
     def load_table(self):
         try:
             two_months_ago = datetime.now().replace(day=1).date().strftime('%Y-%m-%d')
+            all_columns = self.display_columns + self.hidden_columns
+
             base_query = f"""
-                SELECT {', '.join(f'[{col}]' for col in self.display_columns)} 
+                SELECT {', '.join(f'[{col}]' for col in all_columns)}
                 FROM {self.table_name}
                 WHERE Estado = 'Pendiente'
                 AND Activo = 1
@@ -2024,8 +2039,10 @@ class SQLApp:
     def edita_table(self):
         try:
             two_months_ago = datetime.now().replace(day=1).date().strftime('%Y-%m-%d')
+            all_columns = self.display_columns + self.hidden_columns
+
             base_query = f"""
-                SELECT {', '.join(f'[{col}]' for col in self.display_columns)} 
+                SELECT {', '.join(f'[{col}]' for col in all_columns)}
                 FROM {self.table_name}
                 WHERE Estado = 'Confirmado'
                 AND Activo = 1
@@ -2100,9 +2117,26 @@ class SQLApp:
                 df[col] = df[col].dt.strftime("%Y-%m-%d %H:%M:%S")
         
         # Insertar datos
+        # Diccionario para almacenar registros completos
+        self.registros_raw = {}
+
         for _, row in df.iterrows():
+
+            # 1) Crear id compuesto único
+            id_registro = f"{row['Codigo_apertura']}|{row['Codigo_cierre']}"
+
+            # 2) Guardar todo el registro (aunque no se muestre en el tree)
+            self.registros_raw[id_registro] = row.to_dict()
+
+            # 3) Obtener solo las columnas visibles
             values = [str(row[col]) for col in self.display_columns]
-            self.tree.insert("", "end", values=values)
+
+            # 4) Insertar en el treeview usando iid = id compuesto
+            self.tree.insert(
+                "", "end",
+                iid=id_registro,        # ← ahora puedes recuperar el registro completo luego
+                values=values
+            )
         
         # Configurar clic en encabezados para filtros
         for col in self.display_columns:
@@ -2676,9 +2710,13 @@ class SQLApp:
             messagebox.showwarning("Advertencia", "Seleccione un registro para editar")
             return
         
-        item = selected[0]
-        values = self.tree.item(item)["values"]
-        data = dict(zip(self.display_columns, values))
+        iid = selected[0]  # ← ahora este es CódigoApertura|CódigoCierre
+        # Validar que exista en registros_raw
+        if iid not in self.registros_raw:
+            messagebox.showerror("Error", "No se encontraron los datos completos del registro.")
+            return
+        # Obtener TODOS los datos del registro (incluye columnas no visibles)
+        data = self.registros_raw[iid]
 
         edit_window = ctk.CTkToplevel(self.root)
         edit_window.title("Editar Registro")
@@ -2936,6 +2974,42 @@ class SQLApp:
             entry.pack(side="left")
             entries[col] = entry
 
+        # === CHECKBOX: Cuenta SAIFI o no ===
+        check_frame = ctk.CTkFrame(edit_window, fg_color="transparent")
+        check_frame.pack(pady=10, fill="x", padx=15)
+
+        ctk.CTkLabel(
+            check_frame, 
+            text="¿Excluir del SAIFI?:", 
+            width=140, 
+            anchor="e"
+        ).pack(side="left", padx=5)
+
+        # Valor actual en BD (asume 1 = cuenta, 0 = no cuenta)
+        valor_actual_saifi = data.get("conteo_saifi")
+        print(f'Valor actual SAIFI: {valor_actual_saifi}')
+        # Variable CTk
+        self.var_saifi = ctk.IntVar(value=valor_actual_saifi)
+
+        # Checkbox (si lo marcan pasa a 0)
+        check = ctk.CTkCheckBox(
+            check_frame,
+            text="Sí",
+            variable=self.var_saifi,
+            onvalue=0,   # Si lo marca → No cuenta
+            offvalue=1,  # Si está desmarcado → Sí cuenta
+            checkbox_width=22,
+            checkbox_height=22,
+            fg_color="#3A3A3A",
+            hover_color="#4F4F4F",
+            border_color="#AAAAAA",
+        )
+        check.pack(side="left", padx=10)
+
+        # Añadir a entries para que se guarde correctamente
+        entries["conteo_saifi"] = self.var_saifi
+
+
         # Botones de acción
         btn_frame = ctk.CTkFrame(edit_window, fg_color="transparent")
         btn_frame.pack(pady=20)
@@ -2943,7 +3017,7 @@ class SQLApp:
         ctk.CTkButton(
             btn_frame,
             text="Guardar Cambios",
-            command=lambda: self.save_changes(item, entries, edit_window),
+            command=lambda: self.save_changes(iid, entries, edit_window),
             width=120,
             height=35,
             fg_color="#28a745",
@@ -2961,6 +3035,7 @@ class SQLApp:
             hover_color="#c82333",
             font=("Arial", 12)
         ).pack(side="left", padx=15)
+
 
         #edit_window.bind("<Return>", lambda e: self.save_changes(item, entries, edit_window))
 
@@ -2994,13 +3069,14 @@ class SQLApp:
         
         # Campos de solo lectura
         read_only_fields = ['Circuito', 'Subestacion', 'Ubicacion']
-        
+        all_columns = self.editable_columns + self.hidden_columns
         # Construir new_data excluyendo campos bloqueados
         new_data = {}
-        for col in self.editable_columns:
+        for col in all_columns:
             if col in read_only_fields:
                 continue  # Saltar campos no editables
-                
+            new_data["conteo_saifi"] = entries["conteo_saifi"].get()
+            print(f'Cuenta SAIFI: {new_data["conteo_saifi"] }')
             if col == "Registro_interrupcion":
                 # Obtener valor real del registro
                 selected_display = entries[col].get().strip()
@@ -3017,7 +3093,9 @@ class SQLApp:
                 new_data[col] = entries[col].get("1.0", "end-1c").strip()
                 
             else:
-                new_data[col] = entries[col].get().strip()
+                
+                new_data[col] = str(entries[col].get()).strip()
+            
         
         fecha_revision = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         new_data['Usuario_actualizacion'] = f'{self.user} - {fecha_revision}'
@@ -3074,7 +3152,7 @@ class SQLApp:
             new_data['Clasificacion'] = 'E'
         # Validación de tipos de datos
         type_errors = []
-        for col in self.editable_columns:
+        for col in all_columns:
             if col in read_only_fields:
                 continue  # Saltar validación para campos bloqueados    
             sql_type = self.get_sql_type(col).lower()
@@ -3092,11 +3170,12 @@ class SQLApp:
         if type_errors:
             messagebox.showerror("Error de tipos", "\n".join(type_errors))
             return
-
+        print("ORIGINAL DATA:", original_data)
+        print("NEW DATA:", new_data)
         # Verificar cambios excluyendo campos bloqueados
         has_changes = any(
             str(original_data.get(col, '')) != str(new_data.get(col, ''))
-            for col in self.editable_columns if col not in read_only_fields
+            for col in all_columns if col not in read_only_fields
         )
 
         if not has_changes:
@@ -3146,7 +3225,8 @@ class SQLApp:
                             Saifi_zona = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_zona AS FLOAT), 0),
                             Saidi_zona = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_zona AS FLOAT), 0),
                             Saifi_sector = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_sector AS FLOAT), 0),
-                            Saidi_sector = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_sector AS FLOAT), 0)
+                            Saidi_sector = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_sector AS FLOAT), 0),
+                            cambio_hora = 'SI'
                         WHERE Codigo_apertura = ? AND Codigo_cierre = ?
                     """
                     cursor.execute(query_indicadores, (str(original_data['Codigo_apertura']), str(original_data['Codigo_cierre'])))
