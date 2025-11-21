@@ -4,6 +4,8 @@ import customtkinter as ctk
 from tkinter import messagebox, ttk
 import pandas as pd
 import re
+import os
+import sys
 from datetime import datetime, timedelta
 from unidecode import unidecode
 import numpy as np
@@ -18,12 +20,21 @@ from office365.runtime.auth.authentication_context import AuthenticationContext
 from office365.sharepoint.files.file import File
 import webbrowser
 import locale
-from customtkinter import CTkImage
+from PIL import Image, ImageTk
 from PIL import Image
 import requests 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("dark-blue")
 
+# --- PARCHE PARA PYINSTALLER Y Tcl/Tk ---
+# --- PARCHE MANUAL PARA STORE PYTHON ---
+# --- PARCHE PARA RUTAS LOCALES ---
+# if getattr(sys, 'frozen', False):
+#     os.environ['TCL_LIBRARY'] = os.path.join(sys._MEIPASS, 'mi_tcl')
+#     os.environ['TK_LIBRARY'] = os.path.join(sys._MEIPASS, 'mi_tk')
+# # ---------------------------------------
+
+# Aquí siguen tus imports (customtkinter, etc...)
 class SQLApp:
     def __init__(self, root):
         self.root = root
@@ -37,7 +48,7 @@ class SQLApp:
         alto_pantalla = 800
         # Configurar geometría para ventana maximizada
         self.root.geometry(f"{ancho_pantalla}x{alto_pantalla}+0+0")
-        self.table_name = "BITACORA_SCADA_BU_19112025_01"
+        self.table_name = "BITACORA_SCADA"
         self.editable_columns = ["Fecha_apertura",'Fecha_cierre',"Tiempo_minutos",'Circuito', 'Subestacion','Ubicacion',"Carga_MVA", "Registro_interrupcion",'Relevador','Observacion'] #columnas que se muestran para editar
         self.editable_invisible_columns =['Fecha_apertura','Fecha_cierre',"Tiempo_horas","Tiempo_minutos", "Carga_MVA",'Registro_interrupcion',"Clasificacion",'Relevador','Interrupcion','Observacion','Usuario_actualizacion','conteo_saifi']#Columnas que se actualizan por debajo del código
         self.display_columns = [
@@ -45,7 +56,7 @@ class SQLApp:
             'Tiempo_horas', 'Tiempo_minutos', 'Zona', 'Sector', 'Subestacion',
             'Circuito', 'Grupo_calidad', 'Tipo_interruptor', 'Equipo_opero','Ubicacion',
             'Carga_MVA', 'Relevador', 'Interrupcion', 'Clasificacion',
-            'Registro_interrupcion', 'Observacion','Estado'
+            'Registro_interrupcion', 'Observacion','Estado','cambio_hora'
         ] #columnas que se muestran en en aplicativo
         self.float_columns = ['Tiempo_minutos','Grupo_calidad']
         self.conn = None
@@ -64,10 +75,11 @@ class SQLApp:
             'Tiempo_horas', 'Tiempo_minutos', 'Sector', 'Subestacion',
             'Circuito', 'Tipo_interruptor', 'Equipo_opero','Ubicacion',
             'Carga_MVA', 'Relevador', 'Interrupcion', 'Clasificacion',
-            'Registro_interrupcion', 'Observacion','Revisado_operaciones','Comentario_operaciones','Comentario_sector','Revision'
+            'Registro_interrupcion', 'Observacion','Revisado_operaciones','Comentario_operaciones','Comentario_sector','Revision','cambio_hora'
         ]      
         self.soporte = 'Si'
         self.share = 'No'
+
 
         self.create_login_interface()
 
@@ -76,12 +88,38 @@ class SQLApp:
         self.login_frame = ctk.CTkFrame(self.root, fg_color="#2B2B2B")
         self.login_frame.pack(fill="both", expand=True)
 
-        # Imagen centrada
-        login_image = CTkImage(
-            Image.open(r"C:\Users\bryan.colindres\Downloads\image-krpJdmUaFohx12nd4YmkMmcJombnwo.png"), 
-            size=(200, 200)  # tamaño más grande para estética
-        )
+# --- Tu función resource_path sigue siendo la misma y es correcta ---
+        def resource_path(relative_path):
+            """Obtiene ruta válida tanto en .exe como en código normal."""
+            try:
+                base_path = sys._MEIPASS
+            except Exception:
+                base_path = os.path.abspath(".")
+
+            return os.path.join(base_path, relative_path)
+
+        # -------------------------------------------------------------------
+        
+        #1. Cargar la imagen usando Pillow/PIL
+        login_img_pil = Image.open(resource_path("assets/login.png"))
+        
+        #2. Redimensionar (si CustomTkinter lo hacía)
+        login_img_resized = login_img_pil.resize((200, 200)) 
+        
+        # 3. Convertir a un objeto PhotoImage de Tkinter/Pillow
+        login_image = ImageTk.PhotoImage(login_img_resized)
+
+        # 4. Usar la imagen en un Label
+        # Asegúrate de guardar una referencia a 'login_image' para evitar que sea eliminada por el garbage collector
+        
+        # Opción A: Usando el Label de CustomTkinter (si el resto de la interfaz lo requiere)
+        # Esto debería funcionar si CTkLabel acepta PhotoImage (que sí lo hace)
+        self.login_image_ref = login_image # REFERENCIA OBLIGATORIA
         ctk.CTkLabel(self.login_frame, image=login_image, text="").pack(pady=(40, 20))
+        
+        # Opción B: Usando el Label de Tkinter estándar (si quieres evitar CTk por completo)
+        # self.login_image_ref = login_image # REFERENCIA OBLIGATORIA
+        # tk.Label(self.login_frame, image=login_image, text="").pack(pady=(40, 20))
 
         # Título centrado
         ctk.CTkLabel(
@@ -320,16 +358,6 @@ class SQLApp:
         self.filter_ano.set(self.current_year)  # Establecer el mes actual como valor por defecto
         ano_menu.pack(side="left", padx=6)
         
-        # Botón Limpiar Filtros
-        ctk.CTkButton(
-            filter_frame,
-            text="Limpiar Filtros",
-            command=self.clear_filters,
-            width=120,
-            fg_color="#6c757d",
-            hover_color="#5a6268"
-        ).pack(side="right", padx=5)
-
         # Barra de botones estilo moderno
         button_container = ctk.CTkFrame(main_container, 
                                     fg_color="transparent",
@@ -338,6 +366,7 @@ class SQLApp:
 
         # Variables para el estado activo
         self.active_tab = ctk.StringVar(value="pendiente")
+        self.revision_tab = ctk.StringVar(value="no_revision")
         
         # Función para actualizar el estilo
         def update_button_style(button_active):
@@ -355,7 +384,7 @@ class SQLApp:
         pendientes_btn = ctk.CTkButton(
             button_container,
             text="🔄 Eventos Pendientes",
-            command=lambda: [self.active_tab.set("pendiente"),self.load_table(), update_button_style(pendientes_btn)],
+            command=lambda: [self.clear_filters(),self.active_tab.set("pendiente"),self.load_table(), update_button_style(pendientes_btn)],
             fg_color="#515A67",
             hover_color="#4B5563",
             corner_radius=6,
@@ -368,7 +397,7 @@ class SQLApp:
         confirmados_btn = ctk.CTkButton(
             button_container,
             text="✅ Eventos Confirmados",
-            command=lambda: [self.active_tab.set("Confirmado"),self.edita_table(), update_button_style(confirmados_btn)],
+            command=lambda: [self.clear_filters(),self.active_tab.set("Confirmado"),self.edita_table(), update_button_style(confirmados_btn)],
             fg_color="#10B981",
             hover_color="#086D4B",
             corner_radius=6,
@@ -422,7 +451,7 @@ class SQLApp:
         ctk.CTkButton(
             button_container,
             text="🔄 Revisión sectores",
-            command=self.revision,
+            command=lambda: [self.revision_tab.set("si_revision"),self.revision()],
             fg_color="#1E1E1E",
             hover_color="#333333",
             border_color="#007ACC",
@@ -430,9 +459,19 @@ class SQLApp:
             corner_radius=6,
             font=("Segoe UI Semibold", 12),
             width=100,
-            height=32
+            height=32,
         ).pack(side="left", padx=5)
-        
+
+        # Botón Limpiar Filtros
+        ctk.CTkButton(
+            button_container,
+            text="Limpiar Filtros",
+            command=self.clear_filters,
+            width=120,
+            fg_color="#6c757d",
+            hover_color="#5a6268"
+        ).pack(side="left", padx=5)
+          
         ctk.CTkButton(
             button_container,
             text="📤  Importar datos",
@@ -602,7 +641,7 @@ class SQLApp:
         ctk.CTkButton(
             filter_frame,
             text="🔙 Volver",
-            command=self.main_interface_nueva,
+            command=lambda: [self.revision_tab.set("no_revision"),self.main_interface_nueva()],
             fg_color="#045b8c",
             hover_color="#053c5b",
             corner_radius=6,
@@ -1340,8 +1379,6 @@ class SQLApp:
         
         # Campos de solo lectura
         read_only_fields = ['Circuito', 'Subestacion', 'Ubicacion']
-        conteo_saifi = entries["conteo_saifi"].get()  # 1 o 0
-        print(f'Cuenta SAIFI: {conteo_saifi}')
         # Construir new_data excluyendo campos bloqueados
         new_data = {}
         for col in self.editable_columns_2:
@@ -1486,14 +1523,45 @@ class SQLApp:
                     query_indicadores = f"""
                         UPDATE {self.table_name}
                         SET 
-                            Saifi_contribucion_global = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_nacional AS FLOAT), 0),
-                            Saidi_contribucion_global = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_nacional AS FLOAT), 0),
-                            Saifi_grupo = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_grupo AS FLOAT), 0),
-                            Saidi_grupo = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_grupo AS FLOAT), 0),
-                            Saifi_zona = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_zona AS FLOAT), 0),
-                            Saidi_zona = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_zona AS FLOAT), 0),
-                            Saifi_sector = CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_sector AS FLOAT), 0),
-                            Saidi_sector = (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) / NULLIF(CAST(Clientes_sector AS FLOAT), 0)
+                            -- SAIFI: si conteo_saifi es 0 → todo queda en 0
+                            Saifi_contribucion_global = CASE 
+                                WHEN conteo_saifi = 0 THEN 0
+                                ELSE CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_nacional AS FLOAT), 0)
+                            END,
+
+                            Saifi_grupo = CASE 
+                                WHEN conteo_saifi = 0 THEN 0
+                                ELSE CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_grupo AS FLOAT), 0)
+                            END,
+
+                            Saifi_zona = CASE 
+                                WHEN conteo_saifi = 0 THEN 0
+                                ELSE CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_zona AS FLOAT), 0)
+                            END,
+
+                            Saifi_sector = CASE 
+                                WHEN conteo_saifi = 0 THEN 0
+                                ELSE CAST(Clientes_afectados AS FLOAT) / NULLIF(CAST(Clientes_sector AS FLOAT), 0)
+                            END,
+
+                            -- SAIDI: se calculan normal
+                            Saidi_contribucion_global = 
+                                (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) 
+                                / NULLIF(CAST(Clientes_nacional AS FLOAT), 0),
+
+                            Saidi_grupo = 
+                                (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) 
+                                / NULLIF(CAST(Clientes_grupo AS FLOAT), 0),
+
+                            Saidi_zona = 
+                                (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) 
+                                / NULLIF(CAST(Clientes_zona AS FLOAT), 0),
+
+                            Saidi_sector = 
+                                (CAST(Clientes_afectados AS FLOAT) * CAST(Tiempo_horas AS FLOAT)) 
+                                / NULLIF(CAST(Clientes_sector AS FLOAT), 0),
+                            cambio_hora = 'SI'
+
                         WHERE Codigo_apertura = ? AND Codigo_cierre = ?
                     """
                     cursor.execute(query_indicadores, (str(original_data['Codigo_apertura']), str(original_data['Codigo_cierre'])))
@@ -1755,23 +1823,26 @@ class SQLApp:
         self.revisados()
 
     def clear_filters(self):
-        self.filter_fecha_inicio.set("")
-        self.filter_fecha_fin.set("")
-        self.filter_codigo.set("")
-        self.filter_fecha.set("")
-        self.filter_mes.set(self.current_month)
-        self.filter_ano.set(self.current_year)
-        # Limpiar todos los filtros de columnas
-        self.active_filters.clear()
-        
-        # Cerrar todas las ventanas de filtro de columnas abiertas
-        for column in list(self.filter_windows.keys()):
-            window = self.filter_windows.pop(column)
-            window.destroy()
-        
-        # Actualizar la tabla aplicando los cambios
-        self.apply_filters()
-        self.apply_active_filters()  # Asegura aplicar los filtros vacíos
+        try:
+            self.filter_fecha_inicio.set("")
+            self.filter_fecha_fin.set("")
+            self.filter_codigo.set("")
+            self.filter_fecha.set("")
+            self.filter_mes.set(self.current_month)
+            self.filter_ano.set(self.current_year)
+            # Limpiar todos los filtros de columnas
+            self.active_filters.clear()
+            
+            # Cerrar todas las ventanas de filtro de columnas abiertas
+            for column in list(self.filter_windows.keys()):
+                window = self.filter_windows.pop(column)
+                window.destroy()
+            
+            # Actualizar la tabla aplicando los cambios
+            self.apply_filters()
+            self.apply_active_filters()  # Asegura aplicar los filtros vacíos
+        except Exception as e:
+            print(f"Error al limpiar filtros: {e}")
         
     def limpiar_filtros(self):
         self.filter_fecha_inicio.set("")
@@ -1827,6 +1898,8 @@ class SQLApp:
             self.record_count.configure(text=f"Registros: {len(filtered_df)}")
         elif self.active_tab_2.get() == "Confirmado":
             self.record_count.configure(text=f"Registros: {len(filtered_df)}")
+        elif self.revision_tab.get() == "si_revision":
+            self.record_count.configure(text=f"Registros: {len(filtered_df)}")
 
         # Resaltar columnas con filtros activos
         for col in self.display_columns:
@@ -1835,7 +1908,7 @@ class SQLApp:
             else:
                 self.tree.heading(col, text=col.upper(), font=('Arial', 10))
 
-        # Refrescar filtros en todas las columnas para actualizar opciones dinámicamente
+        #Refrescar filtros en todas las columnas para actualizar opciones dinámicamente
         for col in self.active_filters.keys():
             self.mostrar_columna_filtrada(col)
     
@@ -1925,6 +1998,7 @@ class SQLApp:
             elif self.active_tab.get() == "Confirmado":
                 self.edita_table()
                 self.x = 'Confirmados'
+            self.clear_filters()
                 
             messagebox.showinfo("Actualizado", f"Tabla de eventos {self.x} actualizados ", parent=self.root)
             
@@ -2195,6 +2269,11 @@ class SQLApp:
         # Diccionario para almacenar registros completos
         self.registros_raw = {}
 
+
+        # limpiar treeview
+        for item in self.tree.get_children():
+            self.tree.delete(item)
+
         for _, row in df.iterrows():
 
             # 1) Crear id compuesto único
@@ -2314,36 +2393,49 @@ class SQLApp:
         self.apply_active_filters()
         
     def apply_active_filters(self):
-        # Copia los datos originales para aplicar los filtros
-        filtered_df = self.original_data.copy()
+        try:
+            # Copia los datos originales para aplicar los filtros
+            filtered_df = self.original_data.copy()
 
-        # Aplicar filtros activos en todas las columnas
-        for column, values in self.active_filters.items():
-            if values:  # Evitar filtros vacíos
-                filtered_df = filtered_df[filtered_df[column].astype(str).isin(values)]
+            # Aplicar filtros activos en todas las columnas
+            for column, values in self.active_filters.items():
+                if values:  # Evitar filtros vacíos
+                    filtered_df = filtered_df[filtered_df[column].astype(str).isin(values)]
 
-        # Actualizar la vista en la tabla (Treeview)
-        self.tree.delete(*self.tree.get_children())
-        for _, row in filtered_df.iterrows():
-            values = [str(row[col]) for col in self.display_columns]
-            self.tree.insert("", "end", values=values)
-
-        # Actualizar el contador de registros
-        if self.active_tab.get() == "pendiente":
-            self.record_count.configure(text=f"Registros pendientes: {len(filtered_df)}")
-        elif self.active_tab.get() == "Confirmado":
-            self.record_count.configure(text=f"Registros Actualizados: {len(filtered_df)}")
-
-        # Resaltar columnas con filtros activos
-        for col in self.display_columns:
-            if col in self.active_filters:
-                self.tree.heading(col, text=f"{col.upper()} ▼", font=('Arial', 10, 'bold'))
+            # Actualizar la vista en la tabla (Treeview)
+            self.tree.delete(*self.tree.get_children())
+            # for _, row in filtered_df.iterrows():
+            #     values = [str(row[col]) for col in self.display_columns]
+            #     self.tree.insert("", "end", values=values)
+            
+            if self.revision_tab.get() == "si_revision":
+                self.mostrar_tabla(filtered_df)
             else:
-                self.tree.heading(col, text=col.upper(), font=('Arial', 10))
+                self.display_table(filtered_df)
+            # Actualizar el contador de registros
+            if self.active_tab.get() == "pendiente":
+                self.record_count.configure(text=f"Registros pendientes: {len(filtered_df)}")
+            elif self.active_tab.get() == "Confirmado":
+                self.record_count.configure(text=f"Registros Actualizados: {len(filtered_df)}")
 
-        # Refrescar filtros en todas las columnas para actualizar opciones dinámicamente
-        for col in self.active_filters.keys():
-            self.show_column_filter(col)
+            # Resaltar columnas con filtros activos
+            # for col in self.display_columns:
+            #     heading_text = col.upper()
+            #     if col in self.active_filters:
+            #         heading_text += " ▼"  # indicar que hay filtro activo
+            #     self.tree.heading(col, text=heading_text)
+
+            # Resaltar columnas con filtros activos 
+            for col in self.display_columns: 
+                if col in self.active_filters: 
+                    self.tree.heading(col, text=f"{col.upper()}", font=('Arial', 10, 'bold')) 
+                else: 
+                    self.tree.heading(col, text=col.upper(), font=('Arial', 10))
+            # Refrescar filtros en todas las columnas para actualizar opciones dinámicamente
+            for col in self.active_filters.keys():
+                self.show_column_filter(col)
+        except Exception as e:
+            print(f"Error al aplicar filtros activos: {e}")
 
     def update_filter_options(self, filtered_df):
         """
@@ -2386,6 +2478,8 @@ class SQLApp:
         values = self.tree.item(item)["values"]
         data = dict(zip(self.display_columns, values))
         
+        fecha_revision = str(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        usuario = f'{self.user} - {fecha_revision}'
         confirm = messagebox.askyesno("Confirmar Eliminación", 
                                     "¿Está seguro de que desea eliminar este registro?\n\n")
         if not confirm:
@@ -2395,10 +2489,11 @@ class SQLApp:
             cursor = self.conn.cursor()
             query = f"""
                 UPDATE {self.table_name}
-                SET Activo = 0
+                SET Activo = 0,
+                    Usuario_actualizacion = ?
                 WHERE Codigo_apertura = ? AND Codigo_cierre = ?
             """
-            cursor.execute(query, (str(data['Codigo_apertura']), str(data['Codigo_cierre'])))
+            cursor.execute(query, (str(usuario),str(data['Codigo_apertura']), str(data['Codigo_cierre'])))
             self.conn.commit()
             
             # Actualizar la interfaz
@@ -2545,6 +2640,8 @@ class SQLApp:
             AND MONTH(Fecha_apertura) = {mes_importacion}
             AND Origen = 'Importado' 
             AND Activo = 1
+            AND cambio_hora = 'NO'
+            AND conteo_saifi = '1'
             group by substring(Usuario_actualizacion,1,8) ,DAY(FECHA_APERTURA)
         """
         df_base = pd.read_sql(query_dias, self.conn)
